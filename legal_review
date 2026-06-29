@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>에바인 스팸엔진 내재화 리스크 검토</title>
+<style>
+  :root{
+    --ink:#16181d;
+    --paper:#f6f4ef;
+    --card:#ffffff;
+    --line:#e3ded3;
+    --muted:#6b6f78;
+    --accent:#b6402e;       /* 경고/리스크 */
+    --accent-soft:#f3ddd6;
+    --safe:#2f6b4f;         /* 회피 가능 */
+    --safe-soft:#dceae2;
+    --warn:#a8761c;         /* 주의 */
+    --warn-soft:#f3e7cd;
+    --navy:#222a3a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px;margin:0 auto;padding:48px 28px 80px;}
+
+  /* ===== Header ===== */
+  header.doc{
+    border-bottom:3px solid var(--ink);
+    padding-bottom:22px;margin-bottom:36px;
+  }
+  .eyebrow{
+    font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--accent);font-weight:700;margin-bottom:14px;
+  }
+  h1{
+    font-size:30px;line-height:1.25;margin:0 0 16px;font-weight:800;letter-spacing:-.02em;
+  }
+  .meta{display:flex;flex-wrap:wrap;gap:8px 24px;font-size:13px;color:var(--muted);}
+  .meta b{color:var(--ink);font-weight:600;}
+  .confidential{
+    display:inline-block;margin-top:14px;font-size:11px;font-weight:700;
+    letter-spacing:.12em;color:var(--accent);border:1px solid var(--accent);
+    padding:3px 10px;border-radius:3px;
+  }
+
+  /* ===== Verdict banner ===== */
+  .verdict{
+    background:var(--navy);color:#fff;border-radius:10px;
+    padding:26px 28px;margin-bottom:40px;
+  }
+  .verdict .label{font-size:11px;letter-spacing:.2em;text-transform:uppercase;opacity:.7;margin-bottom:10px;}
+  .verdict p{margin:0;font-size:17px;font-weight:600;line-height:1.55;}
+  .verdict .hl{color:#ffb9a8;}
+
+  /* ===== Section ===== */
+  section{margin-bottom:46px;}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:22px;border-bottom:1px solid var(--line);padding-bottom:12px;}
+  .sec-num{font-size:13px;font-weight:800;color:var(--accent);letter-spacing:.05em;}
+  .sec-head h2{font-size:21px;margin:0;font-weight:800;letter-spacing:-.01em;}
+  .sec-head .by{font-size:12px;color:var(--muted);margin-left:auto;white-space:nowrap;}
+
+  /* ===== Card ===== */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:22px 24px;margin-bottom:16px;
+  }
+  .card h3{font-size:15px;margin:0 0 12px;font-weight:700;}
+  .card h3 .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;}
+  .tag-safe{background:var(--safe-soft);color:var(--safe);}
+  .tag-warn{background:var(--warn-soft);color:var(--warn);}
+  .tag-risk{background:var(--accent-soft);color:var(--accent);}
+
+  ul.clean{margin:0;padding:0;list-style:none;}
+  ul.clean li{position:relative;padding-left:18px;margin-bottom:8px;font-size:14px;}
+  ul.clean li::before{content:"";position:absolute;left:0;top:9px;width:6px;height:6px;border-radius:50%;background:var(--accent);}
+  ul.clean li.ok::before{background:var(--safe);}
+  ul.clean li b{font-weight:700;}
+  .sub{font-size:13px;color:var(--muted);margin:4px 0 0 18px;}
+
+  /* patent grid */
+  .pgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;}
+  .pcard{border:1px solid var(--line);border-radius:9px;padding:16px 18px;background:var(--card);}
+  .pcard .pn{font-size:12px;font-weight:800;color:var(--accent);letter-spacing:.05em;margin-bottom:6px;}
+  .pcard h4{font-size:14px;margin:0 0 8px;font-weight:700;}
+  .pcard p{font-size:13px;margin:0 0 8px;color:#3a3d44;}
+  .escape{font-size:12.5px;background:var(--safe-soft);color:var(--safe);border-radius:6px;padding:7px 10px;font-weight:600;}
+
+  /* table */
+  table{width:100%;border-collapse:collapse;font-size:13.5px;margin-top:4px;}
+  th,td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;}
+  th{background:#efece4;font-weight:700;font-size:12px;letter-spacing:.03em;}
+  td:first-child{font-weight:700;width:130px;color:var(--navy);}
+  .twrap{border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+
+  /* risk blocks */
+  .risk{border-left:4px solid var(--accent);background:var(--card);border-radius:0 9px 9px 0;padding:16px 20px;margin-bottom:14px;border-top:1px solid var(--line);border-right:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .risk .rt{font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-bottom:6px;}
+  .risk h4{font-size:15px;margin:0 0 8px;font-weight:700;}
+  .risk p{margin:0;font-size:14px;color:#3a3d44;}
+
+  /* weapons */
+  .weapon{display:flex;gap:14px;align-items:flex-start;padding:14px 0;border-bottom:1px dashed var(--line);}
+  .weapon:last-child{border-bottom:none;}
+  .weapon .wn{flex:none;width:46px;height:46px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+  .weapon .wbody{font-size:14px;}
+
+  /* options */
+  .opt{display:grid;grid-template-columns:40px 1fr;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px;background:var(--card);}
+  .opt .obadge{display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px;color:#fff;}
+  .opt .obody{padding:14px 18px;}
+  .opt .obody h4{margin:0 0 6px;font-size:15px;font-weight:700;}
+  .opt .obody p{margin:0;font-size:13px;color:#3a3d44;}
+  .opt .eval{display:block;margin-top:8px;font-size:12.5px;font-weight:600;padding:6px 10px;border-radius:6px;}
+  .o-best .obadge{background:var(--safe);} .o-best .eval{background:var(--safe-soft);color:var(--safe);}
+  .o-warn .obadge{background:var(--warn);} .o-warn .eval{background:var(--warn-soft);color:var(--warn);}
+  .o-risk .obadge{background:var(--accent);} .o-risk .eval{background:var(--accent-soft);color:var(--accent);}
+
+  /* sequential option palette: deep teal → slate, cohesive tonal progression */
+  .opt-1 .obadge{background:#1f5e57;} .opt-1 .eval{background:#e3efec;color:#1f5e57;}
+  .opt-2 .obadge{background:#3a7d72;} .opt-2 .eval{background:#e8f1ee;color:#2c6358;}
+  .opt-3 .obadge{background:#5a8f86;} .opt-3 .eval{background:#ecf2f0;color:#3d6b62;}
+  .opt-4 .obadge{background:#7c8a93;} .opt-4 .eval{background:#eef0f1;color:#566069;}
+  .opt-1 .obadge,.opt-2 .obadge,.opt-3 .obadge,.opt-4 .obadge{font-size:17px;}
+
+  /* recommendation pills */
+  .rec{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 9px;border-radius:20px;margin-left:8px;vertical-align:middle;}
+  .rec-yes{background:#dcefe8;color:#1f5e57;}
+  .rec-no{background:#f4e0da;color:#b6402e;}
+  .rec-alt{background:#ece9e2;color:#7a7065;}
+
+  /* defense requirements */
+  .req{display:grid;grid-template-columns:160px 1fr;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);}
+  .req:last-child{border-bottom:none;}
+  .req .rk{font-weight:700;font-size:13.5px;color:var(--navy);}
+  .req .rv{font-size:13.5px;color:#3a3d44;}
+  .caution{background:var(--accent-soft);color:#7a2a1d;border-radius:8px;padding:13px 16px;font-size:13.5px;font-weight:600;margin-top:14px;}
+
+  /* key message callouts */
+  .keymsg{border-radius:10px;padding:18px 22px 18px 24px;position:relative;}
+  .keymsg::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;border-radius:10px 0 0 10px;}
+  .keymsg .km-tag{display:inline-block;font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;padding:3px 11px;border-radius:20px;margin-bottom:11px;}
+  .keymsg p{margin:0;font-size:16.5px;line-height:1.6;font-weight:500;color:var(--ink);}
+  .keymsg-risk{background:linear-gradient(180deg,#fbeae5 0%,#f6ddd5 100%);}
+  .keymsg-risk::before{background:var(--accent);}
+  .keymsg-risk .km-tag{background:var(--accent);color:#fff;}
+  .km-em{color:var(--accent);font-weight:800;}
+  .keymsg-warn{background:linear-gradient(180deg,#f7ecd4 0%,#f1e3c4 100%);}
+  .keymsg-warn::before{background:var(--warn);}
+  .keymsg-warn .km-tag-warn{background:var(--warn);color:#fff;}
+  .km-em-warn{color:#8a5f12;font-weight:800;}
+  .km-aside{font-size:13.5px;color:var(--muted);font-weight:500;font-style:italic;}
+
+  footer{margin-top:60px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);}
+  @media(max-width:560px){
+    h1{font-size:24px;}
+    .req{grid-template-columns:1fr;gap:2px;}
+    td:first-child{width:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <div class="eyebrow">스팸탐지 엔진 내재화 · 리스크 검토</div>
+    <h1>에바인 엔진 내재화 추진에 따른<br>특허 · 기술탈취 · 공정거래 리스크 검토 결과</h1>
+    <div class="meta">
+      <span><b>일시</b> 2026.06.29(월) 15:00–16:00</span>
+      <span><b>주관</b> 글로벌Telco지원팀</span>
+    </div>
+    <div class="meta" style="margin-top:8px;">
+      <span><b>참석</b> 김태진 팀장·이창용 / 신동욱 책임(AI Protect) / 한승훈 책임(조사대응법무) / 최찬영 팀장·김훈태 책임(지식재산)</span>
+    </div>
+    <span class="confidential">CONFIDENTIAL · 내부 한정</span>
+  </header>
+
+  <div class="verdict">
+    <div class="label">한 줄 결론</div>
+    <p>내재화 추진 여부와 <span class="hl">무관하게 에바인의 이슈 제기는 사실상 확정적</span>이며, <span class="hl">인수(M&A) 또는 별도 라이선스 계약</span>이 가장 깔끔한 리스크 헤징 방안이다.</p>
+  </div>
+
+  <!-- ===== SECTION 1 ===== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">01</span>
+      <h2>특허 검토 결과</h2>
+      <span class="by">지식재산팀</span>
+    </div>
+
+    <div class="card">
+      <h3>검토 범위 및 전제</h3>
+      <ul class="clean">
+        <li>에바인 <b>등록특허 10건 전수 확인</b> — 홈페이지 광고 건수와 일치</li>
+        <li>대표(윤영중) 개인 명의 별도 특허 <b>없음</b> — 전부 에바인 법인 명의</li>
+        <li>이번 검토는 <b>침해검토에 한정</b>(우리 서비스가 침해하는가). <b>무효검토는 미진행</b></li>
+        <li>우리 서비스 사양 파악 제약(PPT·도면만 제공) → 개략 컨셉(AI 스팸차단) 기준 검토</li>
+      </ul>
+    </div>
+
+    <p style="font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.05em;margin:24px 0 12px;">사업 관련성 있는 특허 3건 (임의번호 1·2·7)</p>
+    <div class="pgrid">
+      <div class="pcard">
+        <div class="pn">특허 1번</div>
+        <h4>3단계 스팸차단 구조</h4>
+        <p>① 수신자 통화성향(요일별 패턴) → ② 수신시간대 → ③ 단말기 차단레벨 설정값과 발신자 스팸지수 비교</p>
+        <div class="escape">회피 방안: 수신인자 3개를 다 쓰지 않거나, 인자를 다르게 산출 / '차단→발신정보 제공' 순서를 바꿔 구현</div>
+      </div>
+      <div class="pcard">
+        <div class="pn">특허 2번</div>
+        <h4>한정사항 과다 · 권리범위 좁음</h4>
+        <p>차단했던 번호로 내가 다시 발신하면 차단이 해제되는 <b>유동적 차단 시나리오</b> 포함</p>
+        <div class="escape">회피 방안: 해당 시나리오를 넣지 않으면 회피 가능</div>
+      </div>
+      <div class="pcard">
+        <div class="pn">특허 7번</div>
+        <h4>다중 앱 서버 조회 후 최초 도달 정보 기준</h4>
+        <p>현 안드로이드는 OS 단에서 스팸정보 수신 앱을 사용자가 선택하는 구조 → 해당 구조와 상이(구특허 추정)</p>
+        <div class="escape">회피 방안: 현행 OS 구조와 달라 회피 가능</div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>관련성 낮은 특허 <span class="tag tag-safe">4·5·6번 외</span></h3>
+      <ul class="clean">
+        <li class="ok">4번 아웃바운드 콜 리워드 지급 / 5번 리워드 관련 / 6번 발신자 정보 노출 문구</li>
+        <li class="ok">그 외 유선단말 관련 → 모두 관련성 낮음</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h3>특허 검토 핵심 판단 <span class="tag tag-safe">회피 난이도 낮음</span></h3>
+      <ul class="clean">
+        <li class="ok"><b>지식재산팀 결론:</b> 권리범위가 넓거나 정교하지 않아 회피 난이도 낮음</li>
+        <li class="ok"><b>판단 기준:</b> "3개 인자 모두 포함 + 알파"는 침해 / <b>3개 중 하나라도 빼면 비침해</b>. 추가 팩터를 더 쓰는 게 아니라 <b>3개를 다 가지는지가 관건</b></li>
+        <li class="ok"><b>AI Protect 스쿼드 판단:</b> 자체 엔진은 훨씬 다양한 팩터 기반 → 회피 충분히 가능</li>
+        <li>만약, U+ 자체 엔진이 <b>'수신율 인자'를 필수로 쓴다면</b> → 무효검토 단계로 이행 필요(출원일 이전 일반기술과 비교)</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 2 ===== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">02</span>
+      <h2>기술탈취 · 공정거래법 리스크</h2>
+      <span class="by">조사대응법무팀</span>
+    </div>
+    <p style="font-size:14px;color:var(--muted);margin:-8px 0 22px;"><b>검토 질문: "에바인이 기술탈취 이슈를 제기할 수 있는가"</b></p>
+
+    <p style="font-size:13px;color:var(--muted);font-weight:700;letter-spacing:.05em;margin:0 0 10px;">현행 협력 구조 (mVoIP과의 차이)</p>
+    <div class="twrap">
+      <table>
+        <tr><th>구분</th><th>mVoIP</th><th>에바인</th></tr>
+        <tr><td>계약 성격</td><td>용역 개발(Co-work)</td><td>솔루션 납품 개념</td></tr>
+        <tr><td>핵심기술 인지</td><td>설계도면·핵심기술 상호 공유</td><td>U+는 엔진 내부 로직 접근 불가</td></tr>
+        <tr><td>데이터 흐름</td><td>양사 기술스펙 상호 교환</td><td>U+ → 콜로그 제공 / 에바인 → 스팸지수만 회신</td></tr>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h3>현재 데이터 파이프라인</h3>
+      <ul class="clean">
+        <li>익시오 통화 종료 → U+ 스팸서버에 <b>콜로그 적재</b>(번호·통화시간·연락처 저장여부·기존 스팸지수 등)</li>
+        <li>1일 1회 에바인 학습서버(독립 AWS)로 전송 → <b>제3자 제공 동의 기반</b></li>
+        <li>에바인이 자사 AI엔진 학습 후 <b>번호별 스팸 예상지수만 회신</b></li>
+        <li><b>상호의존 구조:</b> 에바인 학습 데이터의 80% 이상이 U+/익시오 고객 정보 → U+ 이탈 시 정확도 급락</li>
+      </ul>
+    </div>
+
+    <p style="font-size:13px;color:var(--accent);font-weight:800;letter-spacing:.05em;margin:28px 0 8px;">핵심 법적 리스크 (공정거래법 / 하도급법)</p>
+    <div class="keymsg keymsg-risk" style="margin:0 0 18px;">
+      <span class="km-tag">법무팀 핵심 의견</span>
+      <p>내재화를 <b>하든 안 하든</b>, 에바인은 <b class="km-em">100% 이슈를 제기</b>할 것이며 <b class="km-em">방어가 매우 어렵다</b></p>
+    </div>
+
+    <div class="risk">
+      <div class="rt">Risk 1</div>
+      <h4>기술자료 제공요구서 미교부</h4>
+      <p>대기업이 중소기업에 기술자료(소개서·제안요청서·설명자료 등 광범위 해석)를 요청할 때 <b>①기술자료 제공요구서 + ②NDA 2종 세트 체결이 의무</b>. U+ 관례상 협상과정 자료를 건너뛰어 미체결 가능성 높음 → <b>과징금·과태료 대상</b>. 공정위가 2026년 현재 처벌 강화 중(올해 테마교육 진행), <b>소급 적용</b>되어 이미 발생한 리스크는 해결 불가("안고 가야 할 문제").</p>
+    </div>
+    <div class="risk">
+      <div class="rt">Risk 2</div>
+      <h4>거래거절 신고 (계약 종료 시)</h4>
+      <p>에바인의 U+ 매출 의존도 높음 + 대기업–중소기업 구도 → 정상적 계약 종료(연장 X) 시에도 <b>거래거절 사유로 신고(할 것으로 예상), 공정위 조사 100% 착수</b>. "정당한 이유 없이 거래를 끊어 중소기업을 어렵게 했다"는 프레임. 조사는 ①서면 미교부 적발(확정) → ②기술침해 검증 순 진행.</p>
+    </div>
+    <div class="risk">
+      <div class="rt">Risk 3</div>
+      <h4>기술자료 침해 (별도 판단)</h4>
+      <p>특허 침해가 1차 판단 기준이며, 그 외 저작권 침해·기술자료의 영업비밀성도 인정 가능. <b>향후 내재화 개발 산출물이 에바인에게 받은 자료 중 하나라도 연결·포함되면 문제 제기 가능.</b></p>
+    </div>
+
+    <div class="card" style="margin-top:18px;">
+      <h3>가중 리스크 — 에바인이 이미 보유한 "공격 무기" 2종 <span class="tag tag-risk">주의</span></h3>
+      <p style="font-size:13px;color:var(--muted);margin:-4px 0 16px;">법무팀 한승훈 책임이 작년 법무검토 과정에서 확인·공유한 사례. 에바인이 아닌 <b style="color:var(--ink)">U+ 측의 과거 행위</b>로, 에바인에게 유리한 공격 근거가 된다.</p>
+
+      <p style="font-size:13px;color:#3a3d44;background:#efece4;border-radius:8px;padding:11px 14px;margin:0 0 16px;line-height:1.55;"><b>배경 — 계약 구조:</b> 에바인과의 최초 계약은 에바인 기술을 <b>'U+ 스팸 전화 알림' 앱에만 제공</b>하는 것이었다. 이후 익시오·엠보입(mVoIP) 등이 출시되면서 "거기에도 가져다 쓰겠다"며 사용 범위를 넓혔고, 그 과정을 <b>부속합의로 사후 정리</b>했다.</p>
+
+      <div class="weapon">
+        <div class="wn">무기1</div>
+        <div class="wbody"><b>서면 미교부 (하도급법 위반)</b><br>에바인에게 기술자료를 받으면서, 법적 의무인 <b>'기술자료 제공 요구서 + 비밀유지약정(NDA)'을 발행·체결하지 않음</b>.</div>
+      </div>
+      <div class="weapon">
+        <div class="wn">무기2</div>
+        <div class="wbody"><b>계약 범위 외 임의 사용</b><br>최초 계약(스팸알림 앱 한정)을 벗어나 익시오·엠보입 등에 임의로 갖다 쓰다가, 이후 <b>부속합의를 체결하고 추가 비용을 지불해 사후 수습</b>한 이력. (법무 표현: "임의로 갖다 쓰다 걸려서 결국 보속합의서를 체결해 돈을 더 냈다")</div>
+      </div>
+
+      <div class="caution" style="margin-top:16px;">법무 평가 — 이 두 가지 때문에 <b>"하도급 계약을 위반하고 임의 사용까지 한 대기업이, 정당한 사유 없이 거래마저 끊었다"</b>는 프레임이 에바인에게 지나치게 유리하게 성립한다.</div>
+
+      <p class="sub" style="margin-left:0;margin-top:14px;">※ 참고: U+ 내 다른 내재화 시도 팀들도 동일 의견을 공유받았으나, 리스크로 인해 <b>실제 진행 사례 없이 모두 계약을 연장</b>한 것으로 파악됨</p>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 3 ===== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">03</span>
+      <h2>자체 개발(내재화)을 강행할 경우 갖춰야 할 방어 요건</h2>
+    </div>
+    <div class="keymsg keymsg-warn" style="margin:-4px 0 22px;">
+      <span class="km-tag km-tag-warn">베스트 시나리오</span>
+      <p>"기술침해가 아니라 <b class="km-em-warn">독자 개발했다</b>"를 상세 입증 <span class="km-aside">(구구절절 일일이 디테일하게)</span> 완료한 뒤, <b class="km-em-warn">서면 미교부만으로 처벌</b> 받는 것</p>
+    </div>
+
+    <div class="card">
+      <div class="req"><div class="rk">인적 완전 분리</div><div class="rv">에바인 관련 업무 담당자 전원은 향후 신규 조직에서 배제 (현 회의 참석자·스팸 담당자 포함)</div></div>
+      <div class="req"><div class="rk">물리적 분리</div><div class="rv">에바인 관련 자료·시스템 통째로 분리, 기존팀 접근 차단</div></div>
+      <div class="req"><div class="rk">증빙 확보</div><div class="rv">내부 통신지 작성 → 분리 사유·신규팀 구성·조치내역 명문화</div></div>
+      <div class="req"><div class="rk">제3자 입증</div><div class="rv">외부에 완벽 분리를 입증 가능한 수준으로 정비</div></div>
+      <div class="caution">⚠️ 현실적 제약 — 스팸 담당자는 AI Protect스쿼드 1명(신동욱 책임)이며 U+ 내 선례 없음 → 현실적으로 매우 어려움</div>
+    </div>
+  </section>
+
+  <!-- ===== SECTION 4 ===== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">04</span>
+      <h2>검토 대안 (Option 비교)</h2>
+    </div>
+
+    <div class="opt opt-1">
+      <div class="obadge">1</div>
+      <div class="obody">
+        <h4>인수 (M&A) <span class="rec rec-yes">추천</span></h4>
+        <p>에바인 자체를 인수</p>
+        <span class="eval">가장 확실 · 리스크 헤징 효과 큼 — 단, CFO 조직이 비용 타당성·효과성에 회의적이며 과거 부가서비스 인수 실패 선례 존재</span>
+      </div>
+    </div>
+    <div class="opt opt-2">
+      <div class="obadge">2</div>
+      <div class="obody">
+        <h4>자체 개발 (내재화) <span class="rec rec-no">비권장</span></h4>
+        <p>내재화 엔진 독자 개발</p>
+        <span class="eval">에바인 측 공격에 대한 방어 매우 어려움 — 완전 분리 입증 필수, 그래도 이슈 제기는 동일하게 발생</span>
+      </div>
+    </div>
+    <div class="opt opt-3">
+      <div class="obadge">3</div>
+      <div class="obody">
+        <h4>별도 라이선스 계약 <span class="rec rec-yes">추천</span></h4>
+        <p>대가 지불 후 "개발·학습 목적 사용권"을 명시적으로 확보 (기간·목적 제한 없이 데이터·로직 사용)</p>
+        <span class="eval">인수보다 부담 적고 깔끔 — 단, 에바인 요구 금액 확인 필요</span>
+      </div>
+    </div>
+    <div class="opt opt-4">
+      <div class="obadge">4</div>
+      <div class="obody">
+        <h4>계약 유지·연장 <span class="rec rec-alt">대안</span></h4>
+        <p>에바인 계속 사용 (국내 한정 운영도 가능)</p>
+        <span class="eval">글로벌은 별도 계약 필요(의존도·비용 상승) — 인수 취소 및 내재화 성능 미달 시 대안</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Conclusion ===== -->
+  <section>
+    <div class="sec-head">
+      <span class="sec-num">▶</span>
+      <h2>법무 결론</h2>
+    </div>
+    <div class="card">
+      <ul class="clean">
+        <li>내재화 추진 여부와 무관하게 <b>에바인의 이슈 제기는 사실상 확정적</b> → 인수 또는 별도 라이선스 계약이 가장 깔끔한 리스크 헤징 방안</li>
+        <li>글로벌 사업은 내재화 엔진 채택하여 진행 시에도() <b>반드시 에바인과 글로벌 범위에 대한 별도 계약/합의 체결 후 진행 권고</b> — 내재화 엔진을 국내에서 쓰지 않고 글로벌에서만 쓰더라도 에바인은 이슈 제기 가능성 높음</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    내부 검토 자료 · 회의일시 2026.06.29 · 본 문서는 회의 내용 정리를 위한 내부용이며 외부 공유를 금합니다.
+  </footer>
+
+</div>
+</body>
+</html>
